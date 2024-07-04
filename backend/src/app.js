@@ -28,7 +28,9 @@ app.use(express.json());
 app.use('/api/users', require('./routes/userRoutes'));
 app.use('/api', require('./routes/roomRoutes'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
-
+router.post('/create', createRoom);
+router.post('/addAdmin', addAdminToRoom);
+router.post('/removeMember', removeMemberFromRoom);
 // Socket.io and WebRTC
 io.on('connection', (socket) => {
   setupWebRTC(socket, io);

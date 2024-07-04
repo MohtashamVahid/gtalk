@@ -5,24 +5,30 @@ const RoomSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
-  participants: [{
+  description: {
+    type: String,
+    required: true,
+  },
+  members: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   }],
-  maxParticipants: {
+  admins: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+   maxMembers: {
     type: Number,
-    required: true,
-    default: 10, // Default maximum participants
+    default: 10, // تعداد حداکثر اعضا در گروه
   },
   maxSpeakers: {
     type: Number,
-    required: true,
-    default: 3, // Default maximum speakers at a time
+    default: 5, // تعداد حداکثر کاربران همزمان که می‌توانند صحبت کنند
   },
-  currentSpeakers: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-  }]
+  createdAt: {
+    type: Date,
+    default: Date.now,
+  },
 });
 
 const Room = mongoose.model('Room', RoomSchema);

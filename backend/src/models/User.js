@@ -15,6 +15,18 @@ const UserSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+  followers: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  likes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
+  dislikes: [{
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+  }],
 });
 
 const User = mongoose.model('User', UserSchema);
