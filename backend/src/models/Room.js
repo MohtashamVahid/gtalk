@@ -5,6 +5,11 @@ const RoomSchema = new mongoose.Schema({
     type: String,
     required: true,
   },
+   creator: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'User',
+    required: true, // فیلد اجباری برای ذخیره کردن ایدی سازنده
+  },
   description: {
     type: String,
     required: true,
@@ -17,13 +22,29 @@ const RoomSchema = new mongoose.Schema({
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
   }],
-   maxMembers: {
+  maxMembers: {
     type: Number,
-    default: 10, // تعداد حداکثر اعضا در گروه
+    default: 10,
   },
   maxSpeakers: {
     type: Number,
-    default: 5, // تعداد حداکثر کاربران همزمان که می‌توانند صحبت کنند
+    default: 5,
+  },
+  languageId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Language',
+    required: true, // اینجا فیلد اجباری برای ذخیره کردن ایدی زبان
+  },
+  topic: {
+    type: String,
+    required: true,
+  },
+   commentCount: {
+    type: Number,
+    default: 0,
+  },
+  rules: {
+    type: String,
   },
   createdAt: {
     type: Date,
