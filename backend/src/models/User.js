@@ -4,12 +4,10 @@ const UserSchema = new mongoose.Schema({
     username: {
         type: String,
         required: true,
-        unique: true,
     },
     email: {
         type: String,
         required: true,
-        unique: true,
     },
     image: {
         type: String,
@@ -23,7 +21,7 @@ const UserSchema = new mongoose.Schema({
         type: String,
         required: false,
     },
-    bazaar_token: {
+    bazaar_accountId: {
         type: String,
         required: false,
     },
@@ -47,6 +45,14 @@ const UserSchema = new mongoose.Schema({
         type: mongoose.Schema.Types.ObjectId,
         ref: 'Subscription',
     }],
+    device_id: {
+        type: String,
+        required: true,
+    },
+    has_trial: {
+        type: Boolean,
+        default: false,
+    }
 });
 
 const User = mongoose.model('User', UserSchema);

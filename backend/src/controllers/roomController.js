@@ -1,5 +1,6 @@
 const Room = require('../models/Room');
 const User = require('../models/User');
+const { v4: uuidv4 } = require('uuid'); // برای ایجاد شناسه یکتا
 
 const createRoom = async (req, res) => {
     try {
@@ -12,8 +13,9 @@ const createRoom = async (req, res) => {
         if (!user) {
             return res.status(404).json({error: 'User not found'});
         }
-
+        const roomId = uuidv4(); // ایجاد شناسه یکتا برای گروه
         const room = new Room({
+            roomId,
             name,
             description,
             creator: user._id,
@@ -77,8 +79,7 @@ const addMemberToRoom = async (req, res) => {
             return res.status(404).json({ error: 'Room not found' });
         }
 
-        // یک فرض: فرض می‌کنیم userId از قبل در اعضای گروه نیست و باید او را اضافه کنیم
-        if (!room.members.includes(userId)) {
+         if (!room.members.includes(userId)) {
             room.members.push(userId);
             await room.save();
             res.status(200).json({ message: 'User added to room members successfully', room });
@@ -145,10 +146,45 @@ const removeMemberFromRoom = async (req, res) => {
     }
 };
 
+const banMemberFromRoom = async (req, res) => {
+    const { roomId, userId, adminId } = req.body;
+    try {
+        const room = await Room.findById(roomId);
+        if (!room) {
+            return res.status(404).json({ error: 'Room not found' });
+        }
+
+        const adminUser = await User.findById(adminId);
+        if (!adminUser || !room.admins.includes(adminUser._id)) {
+            return res.status(403).json({ error: 'Only admins can ban members' });
+        }
+
+        if (!room.members.includes(userId)) {
+            return res.status(400).json({ error: 'User is not a member of this room' });
+        }
+
+        // First, remove user from members
+        room.members.pull(userId);
+        await room.save();
+
+        // Now add user to bannedMembers
+        if (!room.bannedMembers.includes(userId)) {
+            room.bannedMembers.push(userId);
+        }
+        await room.save();
+
+        res.status(200).json({ message: 'User banned from room successfully', room });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
 module.exports = {
     createRoom,
     addAdminToRoom,
-    removeMemberFromRoom,
     updateRoomSettings,
     addMemberToRoom,
+    removeMemberFromRoom,
+    banMemberFromRoom
 };

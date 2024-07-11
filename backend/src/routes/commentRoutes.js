@@ -1,8 +1,46 @@
 const express = require('express');
-const { addComment, getCommentsByRoom } = require('../controllers/commentController');
+const { getAllComments, addComment } = require('../controllers/commentController');
+const { checkUserRestriction } = require('../middleware/userMiddleWare');
 const router = express.Router();
 
-router.post('/add', addComment);
-router.get('/room/:roomId', getCommentsByRoom);
+// مسیر Swagger و دیگر تنظیمات Swagger
+
+/**
+ * @swagger
+ * /comments:
+ *   get:
+ *     summary: Get all comments
+ *     responses:
+ *       200:
+ *         description: A list of comments
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Comment'
+ */
+router.get('/', getAllComments);
+
+/**
+ * @swagger
+ * /comments:
+ *   post:
+ *     summary: Add a new comment
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             $ref: '#/components/schemas/Comment'
+ *     responses:
+ *       201:
+ *         description: The created comment
+ *         content:
+ *           application/json:
+ *             schema:
+ *               $ref: '#/components/schemas/Comment'
+ */
+router.post('/', checkUserRestriction, addComment);
 
 module.exports = router;

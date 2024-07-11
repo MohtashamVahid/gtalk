@@ -54,53 +54,55 @@ exports.uploadImageAndUpdateUser = async (req, res) => {
     }
 };
 
-const likeUser = async (req, res) => {
-  try {
-    const { userId, targetUserId } = req.body;
-    const user = await User.findById(userId);
-    const targetUser = await User.findById(targetUserId);
+// تابع برای لایک کردن کاربر
+exports.likeUser = async (req, res) => {
+    try {
+        const { userId, targetUserId } = req.body;
+        const user = await User.findById(userId);
+        const targetUser = await User.findById(targetUserId);
 
-    if (!user || !targetUser) {
-      return res.status(404).json({ error: 'User not found' });
+        if (!user || !targetUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (user.likes.includes(targetUserId)) {
+            return res.status(400).json({ error: 'You have already liked this user' });
+        }
+
+        user.likes.push(targetUserId);
+        await user.save();
+
+        res.status(200).json({ message: 'User liked successfully' });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
     }
-
-    if (user.likes.includes(targetUserId)) {
-      return res.status(400).json({ error: 'You have already liked this user' });
-    }
-
-    user.likes.push(targetUserId);
-    await user.save();
-
-    res.status(200).json({ message: 'User liked successfully' });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
 };
 
-const dislikeUser = async (req, res) => {
-  try {
-    const { userId, targetUserId } = req.body;
-    const user = await User.findById(userId);
-    const targetUser = await User.findById(targetUserId);
+// تابع برای دیسلایک کردن کاربر
+exports.dislikeUser = async (req, res) => {
+    try {
+        const { userId, targetUserId } = req.body;
+        const user = await User.findById(userId);
+        const targetUser = await User.findById(targetUserId);
 
-    if (!user || !targetUser) {
-      return res.status(404).json({ error: 'User not found' });
+        if (!user || !targetUser) {
+            return res.status(404).json({ error: 'User not found' });
+        }
+
+        if (user.dislikes.includes(targetUserId)) {
+            return res.status(400).json({ error: 'You have already disliked this user' });
+        }
+
+        user.dislikes.push(targetUserId);
+        await user.save();
+
+        res.status(200).json({ message: 'User disliked successfully' });
+    } catch (error) {
+        res.status(400).json({ error: error.message });
     }
-
-    if (user.dislikes.includes(targetUserId)) {
-      return res.status(400).json({ error: 'You have already disliked this user' });
-    }
-
-    user.dislikes.push(targetUserId);
-    await user.save();
-
-    res.status(200).json({ message: 'User disliked successfully' });
-  } catch (error) {
-    res.status(400).json({ error: error.message });
-  }
 };
 
-// Get user by ID
+// دریافت کاربر با ID
 exports.getUserById = async (req, res) => {
     try {
         const user = await User.findById(req.params.id).populate('followers likes dislikes subscriptions');
@@ -111,7 +113,7 @@ exports.getUserById = async (req, res) => {
     }
 };
 
-// Create a new user
+// ایجاد کاربر جدید
 exports.createUser = async (req, res) => {
     const user = new User({
         username: req.body.username,
@@ -119,7 +121,7 @@ exports.createUser = async (req, res) => {
         image: req.body.image,
         education: req.body.education,
         phone: req.body.phone,
-        bazaar_token: req.body.bazaar_token,
+        bazaar_accountId: req.body.bazaar_accountId,
         password: req.body.password,
     });
 
@@ -131,7 +133,7 @@ exports.createUser = async (req, res) => {
     }
 };
 
-// Update a user
+// به‌روزرسانی کاربر
 exports.updateUser = async (req, res) => {
     try {
         const user = await User.findById(req.params.id);
@@ -142,7 +144,7 @@ exports.updateUser = async (req, res) => {
         user.image = req.body.image || user.image;
         user.education = req.body.education || user.education;
         user.phone = req.body.phone || user.phone;
-        user.bazaar_token = req.body.bazaar_token || user.bazaar_token;
+        user.bazaar_accountId = req.body.bazaar_accountId || user.bazaar_accountId;
         user.password = req.body.password || user.password;
 
         const updatedUser = await user.save();
@@ -152,12 +154,12 @@ exports.updateUser = async (req, res) => {
     }
 };
 
-
+// دریافت کاربر با شناسه بازار
 exports.getUserByBazaarToken = async (req, res) => {
-    const { bazaar_token } = req.params;
+    const { token } = req.params;
 
     try {
-        const user = await User.findOne({ bazaar_token: bazaar_token }).populate('followers likes dislikes subscriptions');
+        const user = await User.findOne({ bazaar_accountId: token }).populate('followers likes dislikes subscriptions');
 
         if (!user) {
             return res.status(404).json({ message: 'User not found' });

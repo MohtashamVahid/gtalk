@@ -12,7 +12,7 @@ const winston = require('winston');
 const helmet = require('helmet'); // برای افزودن امنیت HTTP headers
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
-
+const { v4: uuidv4 } = require('uuid');
 
 const subscriptionRoutes = require('./routes/subscriptionRoutes');
 
@@ -61,7 +61,7 @@ const swaggerOptions = {
 };
 
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
+
 
 
 mongoose.connection.on('connected', () => {
@@ -81,6 +81,7 @@ app.use('/api', require('./routes/appSettingsRoutes'));
 app.use('/api', require('./routes/languageRoutes'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
 
+ app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
 
 const redisClient = new Redis.Cluster([
