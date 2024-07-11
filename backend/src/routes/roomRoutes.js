@@ -1,10 +1,11 @@
 const express = require('express');
-const { createRoom, getRooms, getRoomById, addAdminToRoom, removeMemberFromRoom, updateRoomSettings } = require('../controllers/roomController');
 const router = express.Router();
+const { createRoom, getRooms, getRoomById, addAdminToRoom, removeMemberFromRoom, updateRoomSettings } = require('../controllers/roomController');
+const roomMiddleware = require('../middleware/roomMiddleware');
 
 /**
  * @swagger
- * /api/v1/rooms:
+ * /api/rooms:
  *   post:
  *     summary: Create a new room
  *     tags:
@@ -52,11 +53,11 @@ const router = express.Router();
  *       404:
  *         description: User not found
  */
-router.post('/rooms', createRoom);
+router.post('/rooms', roomMiddleware.checkGroupCreationRestriction, createRoom);
 
 /**
  * @swagger
- * /api/v1/rooms:
+ * /api/rooms:
  *   get:
  *     summary: Get all rooms
  *     tags:
@@ -73,7 +74,7 @@ router.get('/rooms', getRooms);
 
 /**
  * @swagger
- * /api/v1/rooms/{id}:
+ * /api/rooms/{id}:
  *   get:
  *     summary: Get room by ID
  *     tags:
@@ -96,59 +97,7 @@ router.get('/rooms/:id', getRoomById);
 
 /**
  * @swagger
- * /api/v1/rooms/create:
- *   post:
- *     summary: Create a new room (alternate endpoint)
- *     tags:
- *       - Rooms
- *     parameters:
- *       - in: body
- *         name: body
- *         description: Room details
- *         required: true
- *         schema:
- *           type: object
- *           properties:
- *             name:
- *               type: string
- *             description:
- *               type: string
- *             userId:
- *               type: string
- *             admins:
- *               type: array
- *               items:
- *                 type: string
- *             maxMembers:
- *               type: integer
- *             maxSpeakers:
- *               type: integer
- *             languageId:
- *               type: string
- *             topic:
- *               type: string
- *             rules:
- *               type: string
- *     responses:
- *       201:
- *         description: Room created successfully
- *         schema:
- *           type: object
- *           properties:
- *             message:
- *               type: string
- *             room:
- *               $ref: '#/definitions/Room'
- *       400:
- *         description: Missing required fields or invalid data
- *       404:
- *         description: User not found
- */
-router.post('/create', createRoom);
-
-/**
- * @swagger
- * /api/v1/rooms/addAdmin:
+ * /api/rooms/addAdmin:
  *   post:
  *     summary: Add admin to room
  *     tags:
@@ -184,11 +133,11 @@ router.post('/create', createRoom);
  *       404:
  *         description: Room not found
  */
-router.post('/addAdmin', addAdminToRoom);
+router.post('/addAdmin', roomMiddleware.validateRoomId, roomMiddleware.checkUserAccess, addAdminToRoom);
 
 /**
  * @swagger
- * /api/v1/rooms/removeMember:
+ * /api/rooms/removeMember:
  *   post:
  *     summary: Remove member from room
  *     tags:
@@ -224,11 +173,11 @@ router.post('/addAdmin', addAdminToRoom);
  *       404:
  *         description: Room not found
  */
-router.post('/removeMember', removeMemberFromRoom);
+router.post('/removeMember', roomMiddleware.validateRoomId, roomMiddleware.checkUserAccess, removeMemberFromRoom);
 
 /**
  * @swagger
- * /api/v1/rooms/updateSettings:
+ * /api/rooms/updateSettings:
  *   put:
  *     summary: Update room settings
  *     tags:
@@ -270,6 +219,6 @@ router.post('/removeMember', removeMemberFromRoom);
  *       404:
  *         description: Room not found
  */
-router.put('/updateSettings', updateRoomSettings);
+router.put('/updateSettings', roomMiddleware.validateRoomId, roomMiddleware.checkUserAccess, updateRoomSettings);
 
 module.exports = router;

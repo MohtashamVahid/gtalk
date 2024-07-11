@@ -39,6 +39,12 @@ mongoose.connect(process.env.MONGO_URI, {
 });
 
 
+
+mongoose.connection.on('connected', () => {
+  console.log('Connected to MongoDB');
+});
+
+
 const swaggerOptions = {
     swaggerDefinition: {
         openapi: '3.0.0',
@@ -63,10 +69,6 @@ const swaggerOptions = {
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
 
 
-
-mongoose.connection.on('connected', () => {
-  console.log('Connected to MongoDB');
-});
 
 // Middleware
 app.use(express.json());
