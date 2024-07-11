@@ -7,14 +7,17 @@
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
+    "@socket.io/redis-adapter": "^8.3.0",
     "connect-redis": "^7.1.1",
     "dotenv": "^8.2.0",
     "express": "^4.17.1",
+    "express-session": "^1.18.0",
     "ioredis": "^5.4.1",
     "mongoose": "^5.11.15",
     "socket.io": "^4.0.0",
     "socket.io-redis": "^6.1.1",
-    "webrtc": "^1.0.0"
+    "webrtc": "^1.0.0",
+    "winston": "^3.13.0"
   },
   "devDependencies": {
     "nodemon": "^2.0.7"

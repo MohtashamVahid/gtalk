@@ -5,14 +5,6 @@ const AppSettingsSchema = new mongoose.Schema({
     type: Boolean,
     default: true,
   },
-  darkMode: {
-    type: Boolean,
-    default: false,
-  },
-  language: {
-    type: String,
-    default: 'en',
-  },
   maxUsersPerGroup: {
     type: Number,
     default: 10,

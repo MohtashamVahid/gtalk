@@ -6,7 +6,7 @@ const axios = require('axios');
 const joinRoom = async (req, res) => {
   try {
     const { userId, roomId } = req.body;
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).exec();
 
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });
@@ -62,7 +62,7 @@ const leaveRoom = async (req, res) => {
 const startSpeaking = async (req, res) => {
   try {
     const { userId, roomId } = req.body;
-    const room = await Room.findById(roomId);
+    const room = await Room.findById(roomId).exec();
 
     if (!room) {
       return res.status(404).json({ error: 'Room not found' });

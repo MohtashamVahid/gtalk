@@ -1,10 +1,20 @@
 const express = require('express');
-const { registerUser, loginUser,likeUser, dislikeUser } = require('../controllers/userController');
 const router = express.Router();
+const userController = require('../controllers/userController');
 
-router.post('/register', registerUser);
-router.post('/login', loginUser);
-router.post('/like', likeUser);
-router.post('/dislike', dislikeUser);
+// Get all users
+
+// Get user by ID
+router.get('/:id', userController.getUserById);
+
+// Create a new user
+router.post('/', userController.createUser);
+
+// Update a user
+router.put('/:id', userController.updateUser);
+
+router.get('/bazaar_token/:token', userController.getUserByBazaarToken);
+
+router.post('/upload-image/:id', userController.uploadImageAndUpdateUser);
 
 module.exports = router;

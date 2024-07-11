@@ -14,20 +14,16 @@ const getAppSettings = async (req, res) => {
 
 const updateAppSettings = async (req, res) => {
   try {
-    const { notifications, darkMode, language, maxUsersPerGroup, maxParticipantsPerCall } = req.body;
+    const { notifications,  maxUsersPerGroup, maxParticipantsPerCall } = req.body;
     let settings = await AppSettings.findOne();
     if (!settings) {
       settings = new AppSettings({
         notifications,
-        darkMode,
-        language,
         maxUsersPerGroup,
         maxParticipantsPerCall,
       });
     } else {
       settings.notifications = notifications;
-      settings.darkMode = darkMode;
-      settings.language = language;
       settings.maxUsersPerGroup = maxUsersPerGroup;
       settings.maxParticipantsPerCall = maxParticipantsPerCall;
     }

@@ -4,6 +4,10 @@ const User = require('../models/User');
 const createRoom = async (req, res) => {
     try {
         const {name, description, userId, admins, maxMembers, maxSpeakers, languageId, topic, rules} = req.body;
+        if (!name || !description || !userId || !languageId || !topic) {
+            return res.status(400).json({error: 'Missing required fields'});
+        }
+
         const user = await User.findById(userId);
         if (!user) {
             return res.status(404).json({error: 'User not found'});
@@ -12,20 +16,21 @@ const createRoom = async (req, res) => {
         const room = new Room({
             name,
             description,
-            creator: user._id, // ست کردن سازنده به عنوان creator
+            creator: user._id,
             members: [user._id],
-            admins: admins || [user._id], // Set the creator as admin or the provided admins
+            admins: admins || [user._id],
             maxMembers: maxMembers || 10,
             maxSpeakers: maxSpeakers || 5,
             languageId,
             topic,
             rules,
+            commentCount: 0, // Ensure initial commentCount is set
         });
 
         await room.save();
         res.status(201).json({message: 'Room created successfully', room});
     } catch (error) {
-        res.status(400).json({error: error.message});
+        res.status(500).json({error: error.message});
     }
 };
 
@@ -60,9 +65,32 @@ const updateRoomSettings = async (req, res) => {
         await room.save();
         res.status(200).json({message: 'Room settings updated successfully', room});
     } catch (error) {
-        res.status(400).json({error: error.message});
+        res.status(500).json({error: error.message});
     }
 };
+
+const addMemberToRoom = async (req, res) => {
+    try {
+        const { roomId, userId } = req.body;
+        const room = await Room.findById(roomId);
+        if (!room) {
+            return res.status(404).json({ error: 'Room not found' });
+        }
+
+        // یک فرض: فرض می‌کنیم userId از قبل در اعضای گروه نیست و باید او را اضافه کنیم
+        if (!room.members.includes(userId)) {
+            room.members.push(userId);
+            await room.save();
+            res.status(200).json({ message: 'User added to room members successfully', room });
+        } else {
+            res.status(400).json({ error: 'User is already a member of this room' });
+        }
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+
 const addAdminToRoom = async (req, res) => {
     try {
         const {roomId, userId, adminId} = req.body;
@@ -88,7 +116,7 @@ const addAdminToRoom = async (req, res) => {
             res.status(400).json({error: 'User is already an admin of this room'});
         }
     } catch (error) {
-        res.status(400).json({error: error.message});
+        res.status(500).json({error: error.message});
     }
 };
 
@@ -113,7 +141,7 @@ const removeMemberFromRoom = async (req, res) => {
         await room.save();
         res.status(200).json({message: 'User removed from room successfully', room});
     } catch (error) {
-        res.status(400).json({error: error.message});
+        res.status(500).json({error: error.message});
     }
 };
 
@@ -122,4 +150,5 @@ module.exports = {
     addAdminToRoom,
     removeMemberFromRoom,
     updateRoomSettings,
+    addMemberToRoom,
 };
