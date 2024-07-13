@@ -14,6 +14,9 @@ const helmet = require('helmet');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const {v4: uuidv4} = require('uuid');
+const jwt = require('jsonwebtoken');
+
+const Room = require('./models/Room'); // فرض بر این است که مدل Room در این مسیر قرار دارد
 
 dotenv.config();
 
@@ -128,70 +131,139 @@ const configureSocketIo = (io) => {
     io.on('connection', (socket) => {
         logger.info('A user connected', {socketId: socket.id});
 
-               socket.on('createGroup', (groupName) => {
-            const groupKey = `group:${groupName}`;
-            redisClient.sadd(groupKey, socket.id);
-            socket.join(groupName);
-            io.to(groupName).emit('groupCreated', groupName);
-            logger.info('Group created', { groupName, socketId: socket.id });
+        // Authenticate and store user information on connection
+        const token = socket.handshake.query.token;
+        if (!token) {
+            socket.disconnect();
+            return;
+        }
+
+        jwt.verify(token, process.env.JWT_SECRET, (err, user) => {
+            if (err) {
+                socket.disconnect();
+                return;
+            }
+
+            socket.user = user; // Store user information in socket object
         });
 
-        socket.on('joinGroup', (groupName) => {
-            const groupKey = `group:${groupName}`;
-            redisClient.scard(groupKey, (err, count) => {
-                if (count < 100) { // Assuming max group size is 100
-                    redisClient.sadd(groupKey, socket.id);
-                    redisClient.hmset(`user:${socket.id}`, {
-                        'muted': true,
-                        'canTalk': false, // Initial state: muted but cannot talk
-                        'mutedByAdmin': false // Initial state: not muted by admin
+        socket.on('createGroup', async (groupName, description, languageId, topic, typeId) => {
+            // ساختن گروه در MongoDB
+            const newRoom = new Room({
+                roomId: new mongoose.Types.ObjectId().toString(), // تولید یک ID یکتا برای گروه
+                name: groupName,
+                creator: socket.user.userId,
+                description: description,
+                languageId: languageId,
+                topic: topic,
+                type: typeId,
+                members: [socket.user.userId], // افزودن سازنده به عنوان اولین عضو
+                admins: [socket.user.userId] // افزودن سازنده به عنوان اولین ادمین
+            });
+
+            await newRoom.save();
+
+            // ذخیره اطلاعات گروه در Redis
+            const groupKey = `group:${newRoom.roomId}`;
+            redisClient.hmset(groupKey, {
+                'name': newRoom.name,
+                'creator': newRoom.creator.toString(),
+                'description': newRoom.description,
+                'languageId': newRoom.languageId.toString(),
+                'topic': newRoom.topic,
+                'type': newRoom.type.toString()
+            });
+
+            // افزودن ID سازنده به لیست اعضا در Redis
+            redisClient.sadd(`${groupKey}:members`, socket.user.userId.toString());
+            redisClient.sadd(`${groupKey}:admins`, socket.user.userId.toString());
+
+            // پیوستن سازنده به گروه
+            socket.join(groupName);
+
+            // ارسال رویداد برای اطلاع رسانی به کلاینت‌ها که گروه ایجاد شده است
+            io.to(groupName).emit('groupCreated', groupName);
+
+            logger.info('Group created', {groupName, userId: socket.user.userId});
+        });
+
+
+        socket.on('joinGroup', async (roomID) => {
+            const groupKey = `group:${roomID}`;
+
+            // Check if group exists
+            redisClient.exists(groupKey, (err, reply) => {
+                if (reply === 1) {
+                    // Check group size
+                    redisClient.scard(`${groupKey}:members`, (err, count) => {
+                        if (count < 100) { // Assuming max group size is 100
+                            // Add user to group members in Redis
+                            redisClient.sadd(`${groupKey}:members`, socket.user.userId);
+
+                            // Update user's initial status in Redis
+                            redisClient.hmset(`user:${socket.user.userId}`, {
+                                'muted': true,
+                                'canTalk': false // Initial state: muted and cannot talk
+                            });
+
+                            // Join the user to the group in Socket.io
+                            socket.join(roomID);
+
+                            // Emit an event to inform clients that a user joined
+                            io.to(roomID).emit('userJoined', socket.user.userId);
+                        } else {
+                            socket.emit('groupFull', 'The group is already full');
+                        }
                     });
-                    socket.join(groupName);
-                    io.to(groupName).emit('userJoined', socket.id);
                 } else {
-                    socket.emit('groupFull', 'The group is already full');
+                    socket.emit('groupNotFound', 'The group does not exist');
                 }
             });
         });
 
+
         // Function to get users on stage (in a specific group)
         const getUsersOnStage = (groupName, callback) => {
-            const groupKey = `group:${groupName}`;
+            const stageKey = `group:${groupName}:stage`;
+            redisClient.smembers(stageKey, (err, members) => {
+                if (err) {
+                    console.error('Error retrieving members on stage from Redis:', err);
+                    return callback(err, null);
+                }
+                callback(null, members);
+            });
+        };
+
+
+        const getUsersInGroup = (groupName, callback) => {
+            const groupKey = `group:${groupName}:members`;
             redisClient.smembers(groupKey, (err, members) => {
                 if (err) {
                     console.error('Error retrieving members from Redis:', err);
                     return callback(err, null);
                 }
-
-                const multi = redisClient.multi();
-                members.forEach(member => {
-                    multi.hgetall(`user:${member}`);
-                });
-
-                multi.exec((err, results) => {
-                    if (err) {
-                        console.error('Error retrieving user data from Redis:', err);
-                        return callback(err, null);
-                    }
-
-                    const usersOnStage = results.map((user, index) => ({
-                        userId: members[index],
-                        muted: user.muted === 'true',
-                        canTalk: user.canTalk === 'true'
-                    }));
-
-                    callback(null, usersOnStage);
-                });
+                callback(null, members);
             });
         };
 
         socket.on('requestUsersOnStage', (groupName) => {
-            getUsersOnStage(groupName, (err, users) => {
+            getUsersOnStage(groupName, (err, members) => {
                 if (err) {
                     console.error('Error retrieving users on stage:', err);
-                    // Optional: emit an error event to client
+                    socket.emit('error', 'Error retrieving users on stage');
                 } else {
-                    io.to(socket.id).emit('usersOnStage', users);
+                    socket.emit('usersOnStage', members);
+                }
+            });
+        });
+
+        socket.on('requestUsersInGroup', (groupName) => {
+            getUsersInGroup(groupName, (err, members) => {
+                if (err) {
+                    console.error('Error retrieving users in group:', err);
+                    socket.emit('error', 'Error retrieving users in group');
+                } else {
+                    socket.emit('usersInGroup', members);
                 }
             });
         });
@@ -206,17 +278,108 @@ const configureSocketIo = (io) => {
             io.to(groupName).emit('userRequestedToTalk', socket.id);
         });
 
-        socket.on('adminApproveTalkRequest', (userId) => {
-            // Logic to approve the talk request and allow user to talk
-            redisClient.hmset(`user:${userId}`, {
-                'canTalk': true  // Set canTalk to true for the user
-            });
 
-            // Emit an event to inform clients that admin approved the talk request
-            io.emit('userApprovedToTalk', userId);
+        socket.on('adminApproveTalkRequest', async (roomId, userId) => {
+            try {
+                // Read room information from Redis
+                const roomKey = `group:${roomId}`;
+                redisClient.hmget(roomKey, 'name', 'creator', 'description', 'languageId', 'topic', 'type', async (err, result) => {
+                    if (err) {
+                        console.error('Error reading room information from Redis:', err);
+                        return socket.emit('error', 'Error reading room information from Redis');
+                    }
+
+                    const [name, creator, description, languageId, topic, type] = result;
+
+                    // Check if the user is admin of the room
+                    let roomCreator = await redisClient.get(`roomCreator:${socket.user.userId}`);
+
+                    if (!roomCreator) {
+                        const roomInMongo = await Room.findOne({_id: roomId, members: socket.user.userId});
+                        if (!roomInMongo || String(roomInMongo.creator) !== socket.user.userId) {
+                            return socket.emit('notAuthorized', 'You are not authorized to approve talk request');
+                        }
+                        roomCreator = roomInMongo.creator.toString();
+                        await redisClient.set(`roomCreator:${socket.user.userId}`, roomCreator);
+                    } else if (roomCreator !== socket.user.userId.toString()) {
+                        return socket.emit('notAuthorized', 'You are not authorized to approve talk request');
+                    }
+
+                    // Logic to approve the talk request and allow user to talk
+                    redisClient.hmset(`user:${userId}`, {
+                        'canTalk': true  // Set canTalk to true for the user
+                    });
+
+                    // Add user to the stage
+                    const groupName = `group:${name}`;
+                    redisClient.sadd(`${groupName}:stage`, userId);
+
+                    // Emit an event to inform clients that admin approved the talk request
+                    io.to(groupName).emit('userApprovedToTalk', userId);
+                });
+            } catch (err) {
+                console.error('Error approving talk request:', err);
+                socket.emit('error', 'Error approving talk request');
+            }
         });
 
-        socket.on('muteUser', (userId, byAdmin) => {
+        const adminRemoveFromStage = async (roomId, userId) => {
+            try {
+                // Read room information from Redis
+                const roomKey = `group:${roomId}`;
+                redisClient.hmget(roomKey, 'name', 'creator', 'description', 'languageId', 'topic', 'type', async (err, result) => {
+                    if (err) {
+                        console.error('Error reading room information from Redis:', err);
+                        return; // Handle error
+                    }
+
+                    const [name, creator, description, languageId, topic, type] = result;
+
+                    // Check if the user is admin of the room
+                    let roomCreator = await redisClient.get(`roomCreator:${socket.user.userId}`);
+
+                    if (!roomCreator) {
+                        const roomInMongo = await Room.findOne({_id: roomId, members: socket.user.userId});
+                        if (!roomInMongo || String(roomInMongo.creator) !== socket.user.userId) {
+                            console.error('User is not authorized to remove user from stage');
+                            return; // Handle unauthorized error
+                        }
+                        roomCreator = roomInMongo.creator.toString();
+                        await redisClient.set(`roomCreator:${socket.user.userId}`, roomCreator);
+                    } else if (roomCreator !== socket.user.userId.toString()) {
+                        console.error('User is not authorized to remove user from stage');
+                        return; // Handle unauthorized error
+                    }
+
+                    // Remove user from the stage and add to normal members
+                    const groupName = `group:${name}`;
+                    redisClient.srem(`${groupName}:stage`, userId);
+                    redisClient.sadd(`${groupName}:members`, userId);
+
+                    // Emit an event to inform clients that user is removed from stage
+                    io.to(groupName).emit('userRemovedFromStage', userId);
+                });
+            } catch (err) {
+                console.error('Error removing user from stage:', err);
+                // Handle error
+            }
+        };
+
+
+        socket.on('muteUser', async (userId, byAdmin) => {
+            // Check if the user is admin
+            const roomCreator = await redisClient.get(`roomCreator:${socket.user.userId}`);
+
+            if (!roomCreator) {
+                const room = await Room.findOne({members: socket.user.userId});
+                if (!room || String(room.creator) !== socket.user.userId) {
+                    return socket.emit('notAuthorized', 'You are not authorized to mute this user');
+                }
+                await redisClient.set(`roomCreator:${socket.user.userId}`, room.creator);
+            } else if (roomCreator !== socket.user.userId) {
+                return socket.emit('notAuthorized', 'You are not authorized to mute this user');
+            }
+
             // Update user's muted status and whether it was by admin in Redis
             redisClient.hmset(`user:${userId}`, {
                 'muted': true,
@@ -225,31 +388,6 @@ const configureSocketIo = (io) => {
 
             // Emit an event to inform clients that user was muted
             io.emit('userMuted', userId);
-        });
-
-        socket.on('unmuteUser', (userId) => {
-            // Check if the user was muted by admin
-            redisClient.hget(`user:${userId}`, 'mutedByAdmin', (err, mutedByAdmin) => {
-                if (mutedByAdmin === 'true') {
-                    // If muted by admin, only admin can unmute
-                    if (socket.admin) { // Assuming you have a way to check if the socket belongs to an admin
-                        redisClient.hmset(`user:${userId}`, {
-                            'muted': false,
-                            'mutedByAdmin': 'false'
-                        });
-                        io.emit('userUnmuted', userId);
-                    } else {
-                        socket.emit('error', 'You do not have permission to unmute this user');
-                    }
-                } else {
-                    // If not muted by admin, the user can unmute themselves
-                    redisClient.hmset(`user:${userId}`, {
-                        'muted': false,
-                        'mutedByAdmin': 'false'
-                    });
-                    io.emit('userUnmuted', userId);
-                }
-            });
         });
 
 
