@@ -29,7 +29,7 @@ const RoomSchema = new mongoose.Schema({
     }],
     maxMembers: {
         type: Number,
-        default: 10,
+        default: 20,
     },
     maxSpeakers: {
         type: Number,
@@ -50,6 +50,7 @@ const RoomSchema = new mongoose.Schema({
     },
     rules: {
         type: String,
+        required: false,
     },
     bannedMembers: [{
         type: mongoose.Schema.Types.ObjectId,

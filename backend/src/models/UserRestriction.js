@@ -8,7 +8,7 @@ const UserRestrictionSchema = new mongoose.Schema({
   },
   restrictionType: {
     type: String,
-    enum: ['comment', 'join_group'], // انواع محدودیت‌ها می‌تواند متفاوت باشد
+    enum: ['comment', 'join_group', 'message'], // اضافه کردن نوع محدودیت message
     required: true,
   },
   createdAt: {
@@ -20,6 +20,10 @@ const UserRestrictionSchema = new mongoose.Schema({
     type: Date,
     required: true,
   },
+  reportReason: {
+    type: String,
+    required: false, // این فیلد می‌تواند اختیاری باشد
+  }
 });
 
 const UserRestriction = mongoose.model('UserRestriction', UserRestrictionSchema);

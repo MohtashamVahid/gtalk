@@ -1,6 +1,7 @@
 const mongoose = require('mongoose');
 const Schema = mongoose.Schema;
 
+
 // مدل گزارش تخلف
 const ViolationReportSchema = new Schema({
     reporterName: {

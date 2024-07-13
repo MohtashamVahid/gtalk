@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const { createViolationReport, getAllViolationReports, getViolationReportById } = require('../controllers/reportController');
+const { getViolationTypes,createViolationReport, getAllViolationReports, getViolationReportById } = require('../controllers/violationReportController');
 
 
 /**
@@ -73,5 +73,23 @@ router.get('/api/violation-reports', getAllViolationReports);
  *         description: Internal Server Error
  */
 router.get('/api/violation-reports/:id', getViolationReportById);
+
+
+
+/**
+ * @swagger
+ * /api/violation-types:   // مسیر جدید برای دریافت انواع تخلفات
+ *   get:
+ *     summary: Get all violation types
+ *     tags:
+ *       - Violation Reports
+ *     responses:
+ *       '200':
+ *         description: Success
+ *       '500':
+ *         description: Internal Server Error
+ */
+router.get('/api/violation-types', getViolationTypes);  // اضافه شده
+
 
 module.exports = router;

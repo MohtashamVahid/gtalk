@@ -81,6 +81,7 @@ app.use('/api/users', require('./routes/commentRoutes'));
 app.use('/api', require('./routes/roomRoutes'));
 app.use('/api', require('./routes/appSettingsRoutes'));
 app.use('/api', require('./routes/languageRoutes'));
+app.use('/api', require('./routes/ruleRoutes'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
 
  app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
