@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const Rule = require('../models/RuleModel'); // مدل قانونها را وارد کنید
+const authenticateJWT = require('../middlewares/authMiddleware');
 
 /**
  * @swagger

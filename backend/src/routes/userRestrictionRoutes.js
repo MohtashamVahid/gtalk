@@ -3,6 +3,7 @@
 const express = require('express');
 const router = express.Router();
 const userRestrictionController = require('../controllers/userRestrictionController');
+const authenticateJWT = require('../middlewares/authMiddleware');
 
 /**
  * @swagger
@@ -42,7 +43,7 @@ const userRestrictionController = require('../controllers/userRestrictionControl
  */
 
 // GET /user_restrictions
-router.get('/', userRestrictionController.getUserRestrictions);
+router.get('/',authenticateJWT, userRestrictionController.getUserRestrictions);
 
 /**
  * @swagger
@@ -92,7 +93,7 @@ router.get('/', userRestrictionController.getUserRestrictions);
  */
 
 // POST /user_restrictions
-router.post('/', userRestrictionController.createUserRestriction);
+router.post('/',authenticateJWT, userRestrictionController.createUserRestriction);
 
 
 /**
@@ -117,7 +118,7 @@ router.post('/', userRestrictionController.createUserRestriction);
  *         description: Internal server error
  */
 
-router.delete('/:id', userRestrictionController.deleteUserRestriction);
+router.delete('/:id',authenticateJWT, userRestrictionController.deleteUserRestriction);
 
 
 module.exports = router;

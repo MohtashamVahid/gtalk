@@ -2,6 +2,7 @@ const express = require('express');
 const router = express.Router();
 const { getViolationTypes,createViolationReport, getAllViolationReports, getViolationReportById } = require('../controllers/violationReportController');
 
+const authenticateJWT = require('../middlewares/authMiddleware');
 
 /**
  * @swagger
@@ -34,7 +35,7 @@ const { getViolationTypes,createViolationReport, getAllViolationReports, getViol
  *       '500':
  *         description: Internal Server Error
  */
-router.post('/api/violation-reports', createViolationReport);
+router.post('/api/violation-reports',authenticateJWT, createViolationReport);
 
 /**
  * @swagger
@@ -49,7 +50,7 @@ router.post('/api/violation-reports', createViolationReport);
  *       '500':
  *         description: Internal Server Error
  */
-router.get('/api/violation-reports', getAllViolationReports);
+router.get('/api/violation-reports',authenticateJWT, getAllViolationReports);
 
 /**
  * @swagger
@@ -72,7 +73,7 @@ router.get('/api/violation-reports', getAllViolationReports);
  *       '500':
  *         description: Internal Server Error
  */
-router.get('/api/violation-reports/:id', getViolationReportById);
+router.get('/api/violation-reports/:id',authenticateJWT, getViolationReportById);
 
 
 
@@ -89,7 +90,7 @@ router.get('/api/violation-reports/:id', getViolationReportById);
  *       '500':
  *         description: Internal Server Error
  */
-router.get('/api/violation-types', getViolationTypes);  // اضافه شده
+router.get('/api/violation-types',authenticateJWT, getViolationTypes);  // اضافه شده
 
 
 module.exports = router;

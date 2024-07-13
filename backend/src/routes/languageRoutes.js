@@ -1,6 +1,7 @@
 const express = require('express');
 const { getAllLanguages, addLanguage } = require('../controllers/languageController');
 const router = express.Router();
+const authenticateJWT = require('../middlewares/authMiddleware');
 
 
 /**
@@ -60,6 +61,6 @@ router.get('/', getAllLanguages);
  *             schema:
  *               $ref: '#/components/schemas/Language'
  */
-router.post('/', addLanguage);
+router.post('/',authenticateJWT, addLanguage);
 
 module.exports = router;

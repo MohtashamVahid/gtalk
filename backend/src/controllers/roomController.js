@@ -2,6 +2,8 @@ const Room = require('../models/Room');
 const User = require('../models/User');
 const { v4: uuidv4 } = require('uuid'); // برای ایجاد شناسه یکتا
 
+const { redisClient } = require('../app');
+
 const createRoom = async (req, res) => {
     try {
         const {name, description, userId, admins, maxMembers, maxSpeakers, languageId, topic, rules} = req.body;
@@ -35,6 +37,39 @@ const createRoom = async (req, res) => {
         res.status(500).json({error: error.message});
     }
 };
+
+
+const getAllRooms = async (req, res) => {
+    try {
+        // Fetch all rooms from MongoDB
+        const rooms = await Room.find({});
+
+        // Array to store rooms with additional information
+        const roomsWithMemberCount = [];
+
+        // Iterate through each room
+        for (let room of rooms) {
+            // Get the count of active members for each room from Redis
+            const count = await redisClient.scard(`group:${room.name}`);
+
+            // Construct object with room details and member count
+            const roomDetails = {
+                ...room.toObject(), // Convert Mongoose document to plain JS object
+                memberCount: count
+            };
+
+            // Push into the array
+            roomsWithMemberCount.push(roomDetails);
+        }
+
+        // Send the response with all rooms and their member counts
+        res.json(roomsWithMemberCount);
+    } catch (error) {
+        console.error('Error fetching rooms:', error);
+        res.status(500).json({ message: 'Internal Server Error' });
+    }
+};
+
 
 const updateRoomSettings = async (req, res) => {
     try {
@@ -182,6 +217,7 @@ const banMemberFromRoom = async (req, res) => {
 
 module.exports = {
     createRoom,
+    getAllRooms,
     addAdminToRoom,
     updateRoomSettings,
     addMemberToRoom,

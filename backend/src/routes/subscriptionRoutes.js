@@ -1,6 +1,7 @@
 const express = require('express');
 const router = express.Router();
 const subscriptionController = require('../controllers/subscriptionController');
+const authenticateJWT = require('../middlewares/authMiddleware');
 
 /**
  * @swagger
@@ -55,7 +56,7 @@ const subscriptionController = require('../controllers/subscriptionController');
  *         description: User not found
  */
 
-router.post('/:userId/subscriptions', subscriptionController.createSubscription);
-router.get('/:userId/subscriptions', subscriptionController.getSubscriptionsForUser);
+router.post('/:userId/subscriptions',authenticateJWT, subscriptionController.createSubscription);
+router.get('/:userId/subscriptions',authenticateJWT, subscriptionController.getSubscriptionsForUser);
 
 module.exports = router;

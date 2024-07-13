@@ -2,6 +2,7 @@ const User = require('../models/User');
 const multer = require('multer');
 const path = require('path');
 const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 // Multer configuration
 const storage = multer.diskStorage({
@@ -121,7 +122,12 @@ exports.createUser = async (req, res) => {
         });
 
         const newUser = await user.save();
-        res.status(201).json(newUser);
+
+        const token = jwt.sign({
+            userId: newUser.id
+        }, process.env.JWT_SECRET, {expiresIn: '30d'});
+
+        res.status(201).json({newUser, token});
     } catch (error) {
         res.status(400).json({message: error.message});
     }
@@ -203,8 +209,14 @@ exports.handleCafeBazaarLogin = async (req, res) => {
                 user.password = await bcrypt.hash(password, 10);
             }
 
-            await user.save();
-            res.status(200).json(user);
+            const newUser = await user.save();
+
+            const token = jwt.sign({
+                userId: newUser._id
+            }, process.env.JWT_SECRET, {expiresIn: '30d'});
+
+            res.status(201).json({user, token});
+
         } else {
             // اگر کاربر وجود ندارد، کاربر جدید ایجاد کنید
             const hashedPassword = password ? await bcrypt.hash(password, 10) : '';
@@ -222,7 +234,11 @@ exports.handleCafeBazaarLogin = async (req, res) => {
             });
 
             const newUser = await user.save();
-            res.status(201).json(newUser);
+            const token = jwt.sign({
+                userId: newUser.id
+            }, process.env.JWT_SECRET, {expiresIn: '30d'});
+
+            res.status(201).json({newUser, token});
         }
     } catch (error) {
         res.status(400).json({message: error.message});

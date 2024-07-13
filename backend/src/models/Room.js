@@ -60,6 +60,11 @@ const RoomSchema = new mongoose.Schema({
         type: Date,
         default: Date.now,
     },
+     type: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Type',
+        required: true,
+    },
 });
 
 const Room = mongoose.model('Room', RoomSchema);

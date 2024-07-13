@@ -5,6 +5,7 @@ const User = require('../models/User');
 const userController = require('../controllers/userController');
 const multer = require('multer');
 const path = require('path');
+const authenticateJWT = require('../middlewares/authMiddleware');
 
 
 
@@ -44,7 +45,7 @@ const path = require('path');
  *       '400':
  *         description: Invalid request
  */
-router.post('/api/user/upload-image/:id', userController.uploadImage, userController.uploadImageAndUpdateUser);
+router.post('/api/user/upload-image/:id',authenticateJWT, userController.uploadImage, userController.uploadImageAndUpdateUser);
 
 
 /**
@@ -70,7 +71,7 @@ router.post('/api/user/upload-image/:id', userController.uploadImage, userContro
  *       '400':
  *         description: Invalid request or already liked
  */
-router.post('/api/user/like', userController.likeUser);
+router.post('/api/user/like', authenticateJWT,userController.likeUser);
 
 
 /**
@@ -96,7 +97,7 @@ router.post('/api/user/like', userController.likeUser);
  *       '400':
  *         description: Invalid request or already disliked
  */
-router.post('/api/user/dislike', userController.dislikeUser);
+router.post('/api/user/dislike',authenticateJWT, userController.dislikeUser);
 
 
 /**
@@ -118,7 +119,7 @@ router.post('/api/user/dislike', userController.dislikeUser);
  *       '404':
  *         description: User not found
  */
-router.get('/api/user/:id', userController.getUserById);
+router.get('/api/user/:id',authenticateJWT, userController.getUserById);
 
 
 /**
@@ -211,7 +212,7 @@ router.post('/api/user', userController.createUser);
  *       '404':
  *         description: User not found
  */
-router.put('/api/user/:id', userController.updateUser);
+router.put('/api/user/:id',authenticateJWT, userController.updateUser);
 
 
 /**

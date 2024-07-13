@@ -1,7 +1,8 @@
 const express = require('express');
 const { getAllComments, addComment } = require('../controllers/commentController');
-const { checkUserRestriction } = require('../middleware/userMiddleWare');
+const { checkUserRestriction } = require('../middlewares/userMiddleWare');
 const router = express.Router();
+const authenticateJWT = require('../middlewares/authMiddleware');
 
 // مسیر Swagger و دیگر تنظیمات Swagger
 
@@ -20,7 +21,7 @@ const router = express.Router();
  *               items:
  *                 $ref: '#/components/schemas/Comment'
  */
-router.get('/', getAllComments);
+router.get('/',authenticateJWT, getAllComments);
 
 /**
  * @swagger
@@ -41,6 +42,6 @@ router.get('/', getAllComments);
  *             schema:
  *               $ref: '#/components/schemas/Comment'
  */
-router.post('/', checkUserRestriction, addComment);
+router.post('/',authenticateJWT, checkUserRestriction, addComment);
 
 module.exports = router;

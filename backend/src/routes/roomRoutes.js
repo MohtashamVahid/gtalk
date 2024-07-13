@@ -1,7 +1,8 @@
 const express = require('express');
 const router = express.Router();
-const { createRoom, getRooms, getRoomById, addAdminToRoom, removeMemberFromRoom, updateRoomSettings } = require('../controllers/roomController');
-const roomMiddleware = require('../middleware/roomMiddleware');
+const { createRoom, getAllRooms, getRoomById, addAdminToRoom, removeMemberFromRoom, updateRoomSettings } = require('../controllers/roomController');
+const roomMiddleware = require('../middlewares/roomMiddleware');
+const authenticateJWT = require('../middlewares/authMiddleware');
 
 /**
  * @swagger
@@ -53,7 +54,7 @@ const roomMiddleware = require('../middleware/roomMiddleware');
  *       404:
  *         description: User not found
  */
-router.post('/rooms', roomMiddleware.checkGroupCreationRestriction, createRoom);
+router.post('/rooms',authenticateJWT, roomMiddleware.checkGroupCreationRestriction, createRoom);
 
 /**
  * @swagger
@@ -65,12 +66,15 @@ router.post('/rooms', roomMiddleware.checkGroupCreationRestriction, createRoom);
  *     responses:
  *       200:
  *         description: List of rooms
- *         schema:
- *           type: array
- *           items:
- *             $ref: '#/definitions/Room'
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: array
+ *               items:
+ *                 $ref: '#/components/schemas/Room'
  */
-router.get('/rooms', getRooms);
+router.get('/',authenticateJWT, getAllRooms);
+
 
 /**
  * @swagger
@@ -93,7 +97,7 @@ router.get('/rooms', getRooms);
  *       404:
  *         description: Room not found
  */
-router.get('/rooms/:id', getRoomById);
+router.get('/rooms/:id',authenticateJWT, getRoomById);
 
 /**
  * @swagger
@@ -133,7 +137,7 @@ router.get('/rooms/:id', getRoomById);
  *       404:
  *         description: Room not found
  */
-router.post('/addAdmin', roomMiddleware.validateRoomId, roomMiddleware.checkUserAccess, addAdminToRoom);
+router.post('/addAdmin',authenticateJWT, roomMiddleware.validateRoomId, roomMiddleware.checkUserAccess, addAdminToRoom);
 
 /**
  * @swagger
@@ -173,7 +177,7 @@ router.post('/addAdmin', roomMiddleware.validateRoomId, roomMiddleware.checkUser
  *       404:
  *         description: Room not found
  */
-router.post('/removeMember', roomMiddleware.validateRoomId, roomMiddleware.checkUserAccess, removeMemberFromRoom);
+router.post('/removeMember',authenticateJWT, roomMiddleware.validateRoomId, roomMiddleware.checkUserAccess, removeMemberFromRoom);
 
 /**
  * @swagger
@@ -219,6 +223,6 @@ router.post('/removeMember', roomMiddleware.validateRoomId, roomMiddleware.check
  *       404:
  *         description: Room not found
  */
-router.put('/updateSettings', roomMiddleware.validateRoomId, roomMiddleware.checkUserAccess, updateRoomSettings);
+router.put('/updateSettings',authenticateJWT, roomMiddleware.validateRoomId, roomMiddleware.checkUserAccess, updateRoomSettings);
 
 module.exports = router;
