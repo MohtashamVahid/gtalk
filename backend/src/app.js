@@ -10,20 +10,21 @@ const session = require('express-session');
 const RedisStore = require('connect-redis')(session);
 const {createAdapter} = require('@socket.io/redis-adapter');
 const winston = require('winston');
-const helmet = require('helmet'); // برای افزودن امنیت HTTP headers
+const helmet = require('helmet');
 const swaggerJsdoc = require('swagger-jsdoc');
 const swaggerUi = require('swagger-ui-express');
 const {v4: uuidv4} = require('uuid');
 
-
 dotenv.config();
 
+// Create Express app
 const app = express();
 const httpsServer = https.createServer({
-    key: fs.readFileSync(path.join(__dirname, 'ssl', 'private.key')), // مسیر فایل کلید خصوصی
-    cert: fs.readFileSync(path.join(__dirname, 'ssl', 'certificate.crt')), // مسیر فایل گواهی
+    key: fs.readFileSync(path.join(__dirname, 'ssl', 'private.key')),
+    cert: fs.readFileSync(path.join(__dirname, 'ssl', 'certificate.crt')),
 }, app);
 
+// Initialize Socket.io with HTTPS server
 const io = require('socket.io')(httpsServer, {
     cors: {
         origin: '*',
@@ -31,19 +32,17 @@ const io = require('socket.io')(httpsServer, {
     secure: true
 });
 
-
 // MongoDB Connection
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
 });
 
-
 mongoose.connection.on('connected', () => {
     console.log('Connected to MongoDB');
 });
 
-
+// Swagger Options for API documentation
 const swaggerOptions = {
     swaggerDefinition: {
         openapi: '3.0.0',
@@ -62,15 +61,13 @@ const swaggerOptions = {
             ],
         },
     },
-    apis: ['./routes/*.js'], // مسیر فایل‌های route که داکیومنتیشن آن‌ها را می‌خواهید اضافه کنید
+    apis: ['./routes/*.js'],
 };
 
 const swaggerDocs = swaggerJsdoc(swaggerOptions);
 
-
 // Middleware
 app.use(express.json());
-
 
 // Routes
 app.use('/api/users', require('./routes/subscriptionRoutes'));
@@ -82,9 +79,10 @@ app.use('/api', require('./routes/languageRoutes'));
 app.use('/api', require('./routes/ruleRoutes'));
 app.use('/api/sessions', require('./routes/sessionRoutes'));
 
+// Swagger UI setup
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(swaggerDocs));
 
-
+// Redis setup for session storage and pub/sub
 const redisClient = new Redis.Cluster([
     {
         host: process.env.REDIS_HOST_1,
@@ -109,10 +107,11 @@ const pubClient = new Redis.Cluster([
 
 const subClient = pubClient.duplicate();
 
+// Function to configure Socket.io behavior
 const configureSocketIo = (io) => {
     io.adapter(createAdapter(pubClient, subClient));
 
-    // تنظیم winston برای لاگ‌ها
+    // Logger setup with Winston
     const logger = winston.createLogger({
         level: 'info',
         format: winston.format.combine(
@@ -125,31 +124,144 @@ const configureSocketIo = (io) => {
         ]
     });
 
-    // مدیریت اتصالات Socket.io
+    // Socket.io connection management
     io.on('connection', (socket) => {
         logger.info('A user connected', {socketId: socket.id});
 
-        socket.on('createGroup', (groupName) => {
+               socket.on('createGroup', (groupName) => {
             const groupKey = `group:${groupName}`;
             redisClient.sadd(groupKey, socket.id);
             socket.join(groupName);
             io.to(groupName).emit('groupCreated', groupName);
-            logger.info('Group created', {groupName, socketId: socket.id});
+            logger.info('Group created', { groupName, socketId: socket.id });
         });
 
         socket.on('joinGroup', (groupName) => {
             const groupKey = `group:${groupName}`;
             redisClient.scard(groupKey, (err, count) => {
-                if (count < 10) { // فرض کنید حداکثر تعداد اعضا 10 نفر باشد
+                if (count < 100) { // Assuming max group size is 100
                     redisClient.sadd(groupKey, socket.id);
                     redisClient.hmset(`user:${socket.id}`, {
                         'muted': true,
-                        'canTalk': true
+                        'canTalk': false, // Initial state: muted but cannot talk
+                        'mutedByAdmin': false // Initial state: not muted by admin
                     });
                     socket.join(groupName);
                     io.to(groupName).emit('userJoined', socket.id);
                 } else {
                     socket.emit('groupFull', 'The group is already full');
+                }
+            });
+        });
+
+        // Function to get users on stage (in a specific group)
+        const getUsersOnStage = (groupName, callback) => {
+            const groupKey = `group:${groupName}`;
+            redisClient.smembers(groupKey, (err, members) => {
+                if (err) {
+                    console.error('Error retrieving members from Redis:', err);
+                    return callback(err, null);
+                }
+
+                const multi = redisClient.multi();
+                members.forEach(member => {
+                    multi.hgetall(`user:${member}`);
+                });
+
+                multi.exec((err, results) => {
+                    if (err) {
+                        console.error('Error retrieving user data from Redis:', err);
+                        return callback(err, null);
+                    }
+
+                    const usersOnStage = results.map((user, index) => ({
+                        userId: members[index],
+                        muted: user.muted === 'true',
+                        canTalk: user.canTalk === 'true'
+                    }));
+
+                    callback(null, usersOnStage);
+                });
+            });
+        };
+
+        socket.on('requestUsersOnStage', (groupName) => {
+            getUsersOnStage(groupName, (err, users) => {
+                if (err) {
+                    console.error('Error retrieving users on stage:', err);
+                    // Optional: emit an error event to client
+                } else {
+                    io.to(socket.id).emit('usersOnStage', users);
+                }
+            });
+        });
+
+        socket.on('requestToTalk', (groupName) => {
+            // Update user's ability to talk (canTalk) in Redis
+            redisClient.hmset(`user:${socket.id}`, {
+                'canTalk': false  // Initially set to false
+            });
+
+            // Emit an event to inform clients that user requested to talk
+            io.to(groupName).emit('userRequestedToTalk', socket.id);
+        });
+
+        socket.on('adminApproveTalkRequest', (userId) => {
+            // Logic to approve the talk request and allow user to talk
+            redisClient.hmset(`user:${userId}`, {
+                'canTalk': true  // Set canTalk to true for the user
+            });
+
+            // Emit an event to inform clients that admin approved the talk request
+            io.emit('userApprovedToTalk', userId);
+        });
+
+        socket.on('muteUser', (userId, byAdmin) => {
+            // Update user's muted status and whether it was by admin in Redis
+            redisClient.hmset(`user:${userId}`, {
+                'muted': true,
+                'mutedByAdmin': byAdmin ? 'true' : 'false'
+            });
+
+            // Emit an event to inform clients that user was muted
+            io.emit('userMuted', userId);
+        });
+
+        socket.on('unmuteUser', (userId) => {
+            // Check if the user was muted by admin
+            redisClient.hget(`user:${userId}`, 'mutedByAdmin', (err, mutedByAdmin) => {
+                if (mutedByAdmin === 'true') {
+                    // If muted by admin, only admin can unmute
+                    if (socket.admin) { // Assuming you have a way to check if the socket belongs to an admin
+                        redisClient.hmset(`user:${userId}`, {
+                            'muted': false,
+                            'mutedByAdmin': 'false'
+                        });
+                        io.emit('userUnmuted', userId);
+                    } else {
+                        socket.emit('error', 'You do not have permission to unmute this user');
+                    }
+                } else {
+                    // If not muted by admin, the user can unmute themselves
+                    redisClient.hmset(`user:${userId}`, {
+                        'muted': false,
+                        'mutedByAdmin': 'false'
+                    });
+                    io.emit('userUnmuted', userId);
+                }
+            });
+        });
+
+
+        // Handle 'sendMessage' event with canTalk check
+        socket.on('sendMessage', (groupName, message) => {
+            redisClient.hget(`user:${socket.id}`, 'canTalk', (err, canTalk) => {
+                if (canTalk === 'true') {
+                    const commentChannel = `comments:${groupName}`;
+                    redisClient.publish(commentChannel, JSON.stringify({user: socket.id, message: message}));
+                    logger.info('Message sent', {groupName, message, socketId: socket.id});
+                } else {
+                    // Handle inability to talk (optional: emit an error)
                 }
             });
         });
@@ -161,52 +273,6 @@ const configureSocketIo = (io) => {
             io.to(groupName).emit('userLeft', socket.id);
         });
 
-        socket.on('muteUser', (groupName, userId) => {
-            const muteKey = `mute:${groupName}:${userId}`;
-            redisClient.set(muteKey, true);
-            logger.info('User muted', {groupName, userId});
-        });
-
-        socket.on('unmuteUser', (groupName, userId) => {
-            const muteKey = `mute:${groupName}:${userId}`;
-            redisClient.del(muteKey);
-            logger.info('User unmuted', {groupName, userId});
-        });
-
-        socket.on('sendMessage', (groupName, message) => {
-            const commentChannel = `comments:${groupName}`;
-            redisClient.publish(commentChannel, JSON.stringify({user: socket.id, message: message}));
-            logger.info('Message sent', {groupName, message, socketId: socket.id});
-        });
-
-        socket.on('adminMuteUser', (userId) => {
-            redisClient.hset(`user:${userId}`, 'muted', true);
-            logger.info('Admin muted user', {userId});
-        });
-
-        socket.on('adminUnmuteUser', (userId) => {
-            redisClient.hdel(`user:${userId}`, 'muted');
-            logger.info('Admin unmuted user', {userId});
-        });
-
-        socket.on('webrtcOffer', (data) => {
-            const {groupName, offer, userId} = data;
-            socket.to(groupName).emit('webrtcOffer', {offer, userId});
-            logger.info('WebRTC offer sent', {groupName, offer, userId});
-        });
-
-        socket.on('webrtcAnswer', (data) => {
-            const {groupName, answer, userId} = data;
-            socket.to(groupName).emit('webrtcAnswer', {answer, userId});
-            logger.info('WebRTC answer sent', {groupName, answer, userId});
-        });
-
-        socket.on('webrtcCandidate', (data) => {
-            const {groupName, candidate, userId} = data;
-            socket.to(groupName).emit('webrtcCandidate', {candidate, userId});
-            logger.info('WebRTC candidate sent', {groupName, candidate, userId});
-        });
-
         socket.on('disconnect', () => {
             logger.info('User disconnected', {socketId: socket.id});
             redisClient.keys('group:*', (err, keys) => {
@@ -216,6 +282,7 @@ const configureSocketIo = (io) => {
             });
         });
 
+        // Subscribe to comment channel for group
         const commentChannel = `comments:*`;
         redisClient.subscribe(commentChannel);
         redisClient.on('message', (channel, message) => {
@@ -226,7 +293,7 @@ const configureSocketIo = (io) => {
         });
     });
 
-    // امنیت Redis را افزایش دهید
+    // Increase Redis security handling
     redisClient.on('error', (err) => {
         logger.error('Redis error', {error: err});
     });
@@ -240,16 +307,16 @@ const configureSocketIo = (io) => {
     });
 };
 
-// افزودن امنیت HTTP headers
+// Enhance HTTP headers security
 app.use(helmet());
 
-// استفاده از سشن‌های ذخیره شده در Redis
+// Use stored sessions in Redis
 app.use(session({
     store: new RedisStore({client: redisClient}),
     secret: process.env.SESSION_SECRET,
     resave: false,
     saveUninitialized: false,
-    cookie: {secure: process.env.NODE_ENV === 'production'} // در تولید به true تغییر دهید
+    cookie: {secure: process.env.NODE_ENV === 'production'}
 }));
 
 module.exports = {app, configureSocketIo};
